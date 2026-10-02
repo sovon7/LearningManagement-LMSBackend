@@ -2,6 +2,7 @@ import { unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { Request, Response } from 'express';
 import { Blog } from '../../../common/modules/Blog';
+import { nextBlogId } from '../../../common/modules/blogIds';
 
 const countWords = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
 
@@ -23,10 +24,33 @@ const removeThumbnail = async (thumbnailImage: string) => {
   await unlink(path.join(process.cwd(), 'uploads', 'blogs', filename)).catch(() => undefined);
 };
 
-export const getBlogs = async (_req: Request, res: Response) => {
+const serializeBlog = (blog: any, currentUserId: string, fallbackAuthorName = '') => {
+  const data = typeof blog.toObject === 'function' ? blog.toObject() : blog;
+  const author = data.authorId;
+  const authorId = String(author && typeof author === 'object' ? author._id : author);
+
+  return {
+    blogId: data.blogId,
+    title: data.title,
+    thumbnailImage: data.thumbnailImage,
+    summary: data.summary,
+    description: data.description,
+    published: data.published,
+    authorName: author && typeof author === 'object' ? author.name || fallbackAuthorName : fallbackAuthorName,
+    isOwner: authorId === currentUserId,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt
+  };
+};
+
+export const getBlogs = async (req: Request, res: Response) => {
   try {
-    const blogs = await Blog.find().sort({ createdAt: -1 });
-    return res.status(200).json({ data: blogs });
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required.' });
+    }
+
+    const blogs = await Blog.find().populate('authorId', 'name').sort({ createdAt: -1 });
+    return res.status(200).json({ data: blogs.map((blog) => serializeBlog(blog, req.user!.userId)) });
   } catch (error) {
     return res.status(500).json({ message: 'Blog fetch failed.', error: error instanceof Error ? error.message : 'Unknown error' });
   }
@@ -54,13 +78,17 @@ export const createBlog = async (req: Request, res: Response) => {
     }
 
     const blog = await Blog.create({
+      blogId: await nextBlogId(),
       ...fields,
       thumbnailImage: `/uploads/blogs/${req.file.filename}`,
       authorId: req.user.userId,
-      published: req.body?.published === 'true'
+      published: true
     });
 
-    return res.status(201).json({ message: 'Blog created successfully.', data: blog });
+    return res.status(201).json({
+      message: 'Blog created successfully.',
+      data: serializeBlog(blog, req.user.userId, req.user.userName)
+    });
   } catch (error) {
     if (req.file) {
       await removeThumbnail(`/uploads/blogs/${req.file.filename}`);
@@ -75,12 +103,12 @@ export const updateBlog = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Authentication required.' });
     }
 
-    const blog = await Blog.findById(req.params.id);
+    const blog = await Blog.findOne({ blogId: req.params.blogId });
     if (!blog) {
       return res.status(404).json({ message: 'Blog not found.' });
     }
 
-    if (String(blog.authorId) !== req.user.userId) {
+    if (req.user.userRole !== 'CANDIDATE' || String(blog.authorId) !== req.user.userId) {
       return res.status(403).json({ message: 'Candidate users can only update their own blogs.' });
     }
 
@@ -102,15 +130,14 @@ export const updateBlog = async (req: Request, res: Response) => {
     if (req.file) {
       blog.thumbnailImage = `/uploads/blogs/${req.file.filename}`;
     }
-    if (req.body?.published !== undefined) {
-      blog.published = req.body.published === 'true';
-    }
-
     await blog.save();
     if (req.file) {
       await removeThumbnail(previousThumbnail);
     }
-    return res.status(200).json({ message: 'Blog updated successfully.', data: blog });
+    return res.status(200).json({
+      message: 'Blog updated successfully.',
+      data: serializeBlog(blog, req.user.userId, req.user.userName)
+    });
   } catch (error) {
     if (req.file) {
       await removeThumbnail(`/uploads/blogs/${req.file.filename}`);
@@ -125,12 +152,12 @@ export const deleteBlog = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Authentication required.' });
     }
 
-    const blog = await Blog.findById(req.params.id);
+    const blog = await Blog.findOne({ blogId: req.params.blogId });
     if (!blog) {
       return res.status(404).json({ message: 'Blog not found.' });
     }
 
-    if (String(blog.authorId) !== req.user.userId) {
+    if (req.user.userRole !== 'ADMIN' && String(blog.authorId) !== req.user.userId) {
       return res.status(403).json({ message: 'Candidate users can only delete their own blogs.' });
     }
 

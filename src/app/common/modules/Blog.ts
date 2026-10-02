@@ -1,6 +1,7 @@
 import mongoose, { Schema, model, type Document } from 'mongoose';
 
 export interface IBlog extends Document {
+  blogId: string;
   title: string;
   thumbnailImage: string;
   summary: string;
@@ -13,6 +14,11 @@ export interface IBlog extends Document {
 
 const blogSchema = new Schema<IBlog>(
   {
+    blogId: {
+      type: String,
+      required: true,
+      unique: true
+    },
     title: {
       type: String,
       required: true,
@@ -48,10 +54,19 @@ const blogSchema = new Schema<IBlog>(
     },
     published: {
       type: Boolean,
-      default: false
+      default: true
     }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform: (_document, result: Record<string, unknown>) => {
+        delete result._id;
+        delete result.__v;
+        return result;
+      }
+    }
+  }
 );
 
 export const Blog = mongoose.models.Blog || model<IBlog>('Blog', blogSchema);

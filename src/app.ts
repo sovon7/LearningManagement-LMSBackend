@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import adminRoutes from './app/modules/Admin/Route/admin.routes';
+import adminBlogRoutes from './app/modules/Admin/Route/adminBlog.routes';
 import candidateRoutes from './app/modules/Candidate/Route/candidate.routes';
 
 dotenv.config();
@@ -26,6 +27,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/admin', adminRoutes);
 app.use('/api/candidate', candidateRoutes);
+app.use('/api/blogs', adminBlogRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found.' });

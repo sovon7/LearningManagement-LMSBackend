@@ -3,6 +3,7 @@ import app from './app';
 import { connectDB } from './app/config/db';
 import { initializeCourseIds } from './app/common/modules/courseIds';
 import { initializeQuizIds } from './app/common/modules/quizIds';
+import { initializeBlogIds } from './app/common/modules/blogIds';
 
 dotenv.config();
 
@@ -12,6 +13,7 @@ const startServer = async () => {
   await connectDB();
   await initializeCourseIds();
   await initializeQuizIds();
+  await initializeBlogIds();
   app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
   });

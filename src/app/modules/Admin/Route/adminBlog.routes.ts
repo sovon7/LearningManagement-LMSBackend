@@ -10,9 +10,9 @@ import {
 
 const router = Router();
 
-router.get('/', authenticate, getBlogs);
+router.get('/', authenticate, requireRole('ADMIN', 'CANDIDATE'), getBlogs);
 router.post('/', authenticate, requireRole('CANDIDATE'), uploadBlogThumbnail, createBlog);
-router.put('/:id', authenticate, requireRole('CANDIDATE'), uploadBlogThumbnail, updateBlog);
-router.delete('/:id', authenticate, requireRole('CANDIDATE'), deleteBlog);
+router.put('/:blogId', authenticate, requireRole('CANDIDATE'), uploadBlogThumbnail, updateBlog);
+router.delete('/:blogId', authenticate, requireRole('ADMIN', 'CANDIDATE'), deleteBlog);
 
 export default router;
